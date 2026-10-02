@@ -7,12 +7,19 @@ from discord.ext import commands
 from cogs.reviews import ApplicationReviewView, build_application_embed, message_relay_embed
 from utils.applications import create_application, update_application
 from utils.constants import EMBED_COLOR
+from utils.ideas import (
+    IDEA_ACTIVE_STATUSES,
+    create_idea,
+    load_ideas,
+    save_idea,
+)
 from utils.permissions import (
     get_applications_channel_id,
     has_role,
     member_has_role,
 )
 from utils.storage import add_job, load_jobs, remove_job
+from utils.users import get_user_safe
 
 
 def base_embed(**kwargs) -> discord.Embed:
@@ -44,6 +51,10 @@ def get_ideas_channel_id() -> int | None:
 IDEA_DIALOGUE_BY_USER: dict[int, int] = {}
 IDEA_USER_BY_THREAD: dict[int, int] = {}
 
+MAX_EMBED_FIELD = 1024
+EMBED_TOTAL_BUDGET = 5900
+JOB_SEPARATOR = "\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
+
 
 def format_job_block(index: int, job: dict) -> str:
     requirements = _job_requirements(job)
@@ -51,6 +62,10 @@ def format_job_block(index: int, job: dict) -> str:
     if requirements:
         block += f"\n\n**Требования:**\n{requirements}"
     return block
+
+
+def _split_text(text: str, limit: int = MAX_EMBED_FIELD) -> list[str]:
+    return [text[i : i + limit] for i in range(0, len(text), limit)]
 
 
 def build_jobs_embed() -> discord.Embed:
@@ -68,12 +83,38 @@ def build_jobs_embed() -> discord.Embed:
         embed.description = "На данный момент открытых вакансий нет. Загляните позже!"
         return embed
 
-    blocks = [format_job_block(index, job) for index, job in enumerate(jobs, start=1)]
-    body = "\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n".join(
-        blocks
-    )
-    embed.add_field(name="Открытые вакансии", value=body, inline=False)
-    embed.set_footer(text=f"Всего позиций: {len(jobs)}")
+    head_chars = len(embed.title) + len(embed.description)
+    fields: list[str] = []
+    current = ""
+    shown = 0
+    stopped = False
+
+    for index, job in enumerate(jobs, start=1):
+        for part in _split_text(format_job_block(index, job)):
+            piece = part if not current else JOB_SEPARATOR + part
+            if len(current) + len(piece) > MAX_EMBED_FIELD:
+                fields.append(current)
+                current = ""
+                piece = part
+            if head_chars + sum(map(len, fields)) + len(piece) > EMBED_TOTAL_BUDGET:
+                stopped = True
+                break
+            current = piece
+        if stopped:
+            break
+        shown += 1
+
+    if current:
+        fields.append(current)
+
+    for position, value in enumerate(fields):
+        name = "Открытые вакансии" if position == 0 else "Открытые вакансии (продолжение)"
+        embed.add_field(name=name, value=value, inline=False)
+
+    footer = f"Всего позиций: {len(jobs)}"
+    if shown < len(jobs):
+        footer += f" · показано {shown}, уберите лишние через /bl уработа"
+    embed.set_footer(text=footer)
     return embed
 
 
@@ -150,13 +191,22 @@ class NewsModal(discord.ui.Modal, title="Публикация новости"):
                 )
                 return
 
-        if mentions:
-            mention_text = " ".join(f"<@&{role_id}>" for role_id in mentions)
-            await interaction.channel.send(content=mention_text, embed=embed)
-        else:
-            await interaction.channel.send(embed=embed)
+        await interaction.response.defer(ephemeral=True)
 
-        await interaction.response.send_message(
+        try:
+            if mentions:
+                mention_text = " ".join(f"<@&{role_id}>" for role_id in mentions)
+                await interaction.channel.send(content=mention_text, embed=embed)
+            else:
+                await interaction.channel.send(embed=embed)
+        except (discord.Forbidden, discord.HTTPException):
+            await interaction.followup.send(
+                "❌ Не удалось опубликовать новость в этом канале. Проверьте права бота.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.followup.send(
             "✅ Новость опубликована в канал.",
             ephemeral=True,
         )
@@ -205,12 +255,17 @@ class IdeaStatusReasonModal(discord.ui.Modal, title="Причина (необя�
             interaction,
             self.action,
             self.reason.value.strip() or None,
+            reason_collected=True,
         )
 
 
 class IdeaReviewButton(discord.ui.Button):
-    def __init__(self, label: str, style: discord.ButtonStyle, action: str) -> None:
-        super().__init__(label=label, style=style)
+    def __init__(self, idea_id: str, label: str, style: discord.ButtonStyle, action: str) -> None:
+        super().__init__(
+            label=label,
+            style=style,
+            custom_id=f"bl_idea:{idea_id}:{action}",
+        )
         self.action = action
 
     async def callback(self, interaction: discord.Interaction) -> None:
@@ -234,49 +289,66 @@ class IdeaApprovalView(discord.ui.View):
         "dialogue": "Диалог начат",
     }
 
-    def __init__(self, bot: discord.Client, idea_text: str, author: discord.User | discord.Member) -> None:
+    def __init__(self, bot: discord.Client, record: dict) -> None:
         super().__init__(timeout=None)
         self.bot = bot
-        self.idea_text = idea_text
-        self.author = author
-        self.decision_made = False
-        self.status = "new"
-        self.reviewer: discord.Member | None = None
-        self.review_reason: str | None = None
-        self._build_initial_buttons()
+        self.record = record
+        self._rebuild_buttons()
 
-    def _build_initial_buttons(self) -> None:
-        self.clear_items()
-        self.add_item(IdeaReviewButton("Принять", discord.ButtonStyle.success, "accept"))
-        self.add_item(IdeaReviewButton("Отклонить", discord.ButtonStyle.danger, "reject"))
-        self.add_item(IdeaReviewButton("На рассмотрении", discord.ButtonStyle.secondary, "reviewing"))
+    @property
+    def idea_id(self) -> str:
+        return self.record["id"]
 
-    def _build_reviewing_buttons(self) -> None:
+    @property
+    def idea_text(self) -> str:
+        return self.record["text"]
+
+    def _rebuild_buttons(self) -> None:
         self.clear_items()
-        self.add_item(IdeaReviewButton("Принять", discord.ButtonStyle.success, "accept"))
-        self.add_item(IdeaReviewButton("Отклонить", discord.ButtonStyle.danger, "reject"))
-        self.add_item(IdeaReviewButton("Начать диалог", discord.ButtonStyle.secondary, "dialogue"))
+        status = self.record["status"]
+        if status == "new":
+            self.add_item(IdeaReviewButton(self.idea_id, "Принять", discord.ButtonStyle.success, "accept"))
+            self.add_item(IdeaReviewButton(self.idea_id, "Отклонить", discord.ButtonStyle.danger, "reject"))
+            self.add_item(IdeaReviewButton(self.idea_id, "На рассмотрении", discord.ButtonStyle.secondary, "reviewing"))
+        else:
+            self.add_item(IdeaReviewButton(self.idea_id, "Принять", discord.ButtonStyle.success, "accept"))
+            self.add_item(IdeaReviewButton(self.idea_id, "Отклонить", discord.ButtonStyle.danger, "reject"))
+            dialogue = IdeaReviewButton(self.idea_id, "Начать диалог", discord.ButtonStyle.secondary, "dialogue")
+            dialogue.disabled = status != "reviewing"
+            self.add_item(dialogue)
+        if self.record.get("decision_made"):
+            self.disable_all_items()
+
+    def _save(self) -> None:
+        save_idea(self.record)
 
     def disable_all_items(self) -> None:
         for item in self.children:
             item.disabled = True
-
-    def disable_item(self, action: str) -> None:
-        for item in self.children:
-            if isinstance(item, IdeaReviewButton) and item.action == action:
-                item.disabled = True
 
     def build_embed(self) -> discord.Embed:
         embed = base_embed(
             title="Новая идея",
             description=self.idea_text[:4096],
         )
-        embed.add_field(name="От:", value=self.author.mention, inline=False)
-        embed.add_field(name="Статус:", value=self.STATUS_LABELS[self.status], inline=False)
-        if self.reviewer is not None:
-            embed.add_field(name="Выполнил:", value=self.reviewer.mention, inline=False)
-        if self.review_reason:
-            embed.add_field(name="Причина:", value=self.review_reason[:1024], inline=False)
+        embed.add_field(name="От:", value=f"<@{self.record['author_id']}>", inline=False)
+        embed.add_field(
+            name="Статус:",
+            value=self.STATUS_LABELS.get(self.record["status"], self.record["status"]),
+            inline=False,
+        )
+        if self.record.get("reviewer_id"):
+            embed.add_field(
+                name="Выполнил:",
+                value=f"<@{self.record['reviewer_id']}>",
+                inline=False,
+            )
+        if self.record.get("review_reason"):
+            embed.add_field(
+                name="Причина:",
+                value=self.record["review_reason"][:1024],
+                inline=False,
+            )
         return embed
 
     async def process_decision(
@@ -284,6 +356,8 @@ class IdeaApprovalView(discord.ui.View):
         interaction: discord.Interaction,
         action: str,
         reason: str | None = None,
+        *,
+        reason_collected: bool = False,
     ) -> None:
         if not isinstance(interaction.user, discord.Member) or not member_has_role(
             interaction.user, "IDEA_APPROVER_ROLE_ID"
@@ -294,33 +368,51 @@ class IdeaApprovalView(discord.ui.View):
             )
             return
 
-        if action in ("accept", "reject") and reason is None:
+        if self.record.get("decision_made"):
+            await interaction.response.send_message(
+                "По этой идее уже принято решение.",
+                ephemeral=True,
+            )
+            return
+
+        if action in ("accept", "reject") and reason is None and not reason_collected:
             await interaction.response.send_modal(IdeaStatusReasonModal(self, action))
             return
 
         if action == "accept":
-            self.status = "accepted"
-            self.reviewer = interaction.user
-            self.review_reason = reason
-            self.decision_made = True
-            self.disable_all_items()
+            self.record.update(
+                status="accepted",
+                reviewer_id=interaction.user.id,
+                reviewer_name=interaction.user.display_name,
+                review_reason=reason,
+                decision_made=True,
+            )
+            self._save()
+            self._rebuild_buttons()
             await self._finalize_decision(interaction, accepted=True)
             return
 
         if action == "reject":
-            self.status = "rejected"
-            self.reviewer = interaction.user
-            self.review_reason = reason
-            self.decision_made = True
-            self.disable_all_items()
+            self.record.update(
+                status="rejected",
+                reviewer_id=interaction.user.id,
+                reviewer_name=interaction.user.display_name,
+                review_reason=reason,
+                decision_made=True,
+            )
+            self._save()
+            self._rebuild_buttons()
             await self._finalize_decision(interaction, accepted=False)
             return
 
         if action == "reviewing":
-            self.status = "reviewing"
-            self.reviewer = interaction.user
-            self.review_reason = reason
-            self._build_reviewing_buttons()
+            self.record.update(
+                status="reviewing",
+                reviewer_id=interaction.user.id,
+                reviewer_name=interaction.user.display_name,
+            )
+            self._save()
+            self._rebuild_buttons()
             await interaction.response.edit_message(embed=self.build_embed(), view=self)
             await self._notify_author(
                 interaction.client,
@@ -331,14 +423,12 @@ class IdeaApprovalView(discord.ui.View):
             return
 
         if action == "dialogue":
-            if self.status != "reviewing":
+            if self.record["status"] != "reviewing":
                 await interaction.response.send_message(
                     "Сначала поставьте идею на рассмотрение.",
                     ephemeral=True,
                 )
                 return
-            self.status = "dialogue"
-            self.review_reason = reason
             thread = await self._create_dialogue_thread(interaction)
             if thread is None:
                 await interaction.response.send_message(
@@ -346,7 +436,13 @@ class IdeaApprovalView(discord.ui.View):
                     ephemeral=True,
                 )
                 return
-            self.disable_item("dialogue")
+            self.record.update(
+                status="dialogue",
+                reviewer_id=interaction.user.id,
+                reviewer_name=interaction.user.display_name,
+            )
+            self._save()
+            self._rebuild_buttons()
             await interaction.response.edit_message(embed=self.build_embed(), view=self)
             await self._notify_author(
                 interaction.client,
@@ -361,7 +457,7 @@ class IdeaApprovalView(discord.ui.View):
             return None
 
         try:
-            thread_name = f"Диалог — идея от {self.author.display_name}"[:100]
+            thread_name = f"Диалог — идея от {self.record['author_name']}"[:100]
             thread = await interaction.message.create_thread(
                 name=thread_name,
                 auto_archive_duration=10080,
@@ -369,8 +465,10 @@ class IdeaApprovalView(discord.ui.View):
         except Exception:
             return None
 
-        IDEA_DIALOGUE_BY_USER[self.author.id] = thread.id
-        IDEA_USER_BY_THREAD[thread.id] = self.author.id
+        self.record["thread_id"] = thread.id
+        self._save()
+        IDEA_DIALOGUE_BY_USER[self.record["author_id"]] = thread.id
+        IDEA_USER_BY_THREAD[thread.id] = self.record["author_id"]
 
         welcome = base_embed(
             title="Начат диалог",
@@ -381,7 +479,6 @@ class IdeaApprovalView(discord.ui.View):
         )
         await thread.send(embed=welcome)
         return thread
-
 
     async def _publish_accepted_idea(self, interaction: discord.Interaction) -> None:
         idea_channel_id = get_ideas_channel_id()
@@ -400,10 +497,13 @@ class IdeaApprovalView(discord.ui.View):
             description=self.idea_text[:4096],
         )
         public_embed.set_author(
-            name=f"От: {self.author.display_name}",
-            icon_url=self.author.display_avatar.url,
+            name=f"От: {self.record['author_name']}",
+            icon_url=self.record["author_avatar"],
         )
-        message = await idea_channel.send(content=self.author.mention, embed=public_embed)
+        message = await idea_channel.send(
+            content=f"<@{self.record['author_id']}>",
+            embed=public_embed,
+        )
         await message.add_reaction("👍")
         await message.add_reaction("👎")
 
@@ -439,10 +539,14 @@ class IdeaApprovalView(discord.ui.View):
         guild: discord.Guild | None,
     ) -> None:
         embed = base_embed(title=title, description=description)
-        if self.review_reason:
-            embed.add_field(name="Причина:", value=self.review_reason[:1024], inline=False)
-        if self.reviewer is not None:
-            embed.set_footer(text=f"Проверил: {self.reviewer.display_name}")
+        if self.record.get("review_reason"):
+            embed.add_field(
+                name="Причина:",
+                value=self.record["review_reason"][:1024],
+                inline=False,
+            )
+        if self.record.get("reviewer_name"):
+            embed.set_footer(text=f"Проверил: {self.record['reviewer_name']}")
         view = None
         if guild is not None:
             view = discord.ui.View(timeout=None)
@@ -453,8 +557,11 @@ class IdeaApprovalView(discord.ui.View):
                     disabled=True,
                 )
             )
+        author = await get_user_safe(bot, self.record["author_id"])
+        if author is None:
+            return
         try:
-            await self.author.send(embed=embed, view=view)
+            await author.send(embed=embed, view=view)
         except discord.Forbidden:
             pass
 
@@ -495,7 +602,7 @@ class AddJobModal(discord.ui.Modal, title="Добавление вакансии
 
 class JobApplicationModal(discord.ui.Modal):
     def __init__(self, job: dict) -> None:
-        super().__init__(title=f"Заявка: {job['title'][:45]}")
+        super().__init__(title=f"Заявка: {job['title'][:37]}")
         self.job = job
 
         self.name_age = discord.ui.TextInput(
@@ -714,8 +821,16 @@ class BLGroup(app_commands.Group):
             )
             return
 
-        view = IdeaApprovalView(interaction.client, idea_text, interaction.user)
+        record = create_idea(
+            author_id=interaction.user.id,
+            author_name=interaction.user.display_name,
+            author_avatar=interaction.user.display_avatar.url,
+            text=idea_text,
+        )
+        view = IdeaApprovalView(interaction.client, record)
         message = await review_channel.send(embed=view.build_embed(), view=view)
+        record.update(channel_id=review_channel.id, message_id=message.id)
+        save_idea(record)
 
         await interaction.response.send_message(
             "✅ Ваша идея отправлена на рассмотрение. Ожидайте ответа.",
@@ -777,7 +892,16 @@ class BLGroup(app_commands.Group):
 class BL(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.bot.tree.add_command(BLGroup())
+        if self.bot.tree.get_command("bl") is None:
+            self.bot.tree.add_command(BLGroup())
+
+    async def cog_load(self) -> None:
+        for record in load_ideas():
+            if record.get("thread_id"):
+                IDEA_DIALOGUE_BY_USER[record["author_id"]] = record["thread_id"]
+                IDEA_USER_BY_THREAD[record["thread_id"]] = record["author_id"]
+            if record["status"] in IDEA_ACTIVE_STATUSES:
+                self.bot.add_view(IdeaApprovalView(self.bot, record))
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
@@ -802,7 +926,9 @@ class BL(commands.Cog):
             if user_id is None:
                 return
 
-            user = self.bot.get_user(user_id) or await self.bot.fetch_user(user_id)
+            user = await get_user_safe(self.bot, user_id)
+            if user is None:
+                return
             embed = message_relay_embed(message.author, message.content, show_footer=False)
             try:
                 await user.send(embed=embed)
@@ -812,21 +938,6 @@ class BL(commands.Cog):
                     delete_after=10,
                 )
             return
-
-    @commands.Cog.listener()
-    async def on_app_command_error(
-        self,
-        interaction: discord.Interaction,
-        error: app_commands.AppCommandError,
-    ) -> None:
-        if isinstance(error, app_commands.CheckFailure):
-            message = "У вас нет прав для использования этой команды."
-            if interaction.response.is_done():
-                await interaction.followup.send(message, ephemeral=True)
-            else:
-                await interaction.response.send_message(message, ephemeral=True)
-            return
-        raise error
 
 
 async def setup(bot: commands.Bot) -> None:

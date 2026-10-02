@@ -14,6 +14,7 @@ from utils.applications import (
 )
 from utils.constants import EMBED_COLOR
 from utils.permissions import member_has_role
+from utils.users import get_user_safe
 
 log = logging.getLogger("bl-bot.reviews")
 
@@ -261,7 +262,10 @@ async def notify_status_change(
     reviewer: discord.Member,
     guild: discord.Guild | None,
 ) -> None:
-    user = bot.get_user(application["user_id"]) or await bot.fetch_user(application["user_id"])
+    user = await get_user_safe(bot, application["user_id"])
+    if user is None:
+        log.warning("Пользователь %s не найден, уведомление о статусе не отправлено", application["user_id"])
+        return
     status_label = STATUS_LABELS.get(new_status, new_status)
 
     description = (
@@ -295,7 +299,10 @@ async def notify_dialogue_started(
     reviewer: discord.Member,
     guild: discord.Guild | None,
 ) -> None:
-    user = bot.get_user(application["user_id"]) or await bot.fetch_user(application["user_id"])
+    user = await get_user_safe(bot, application["user_id"])
+    if user is None:
+        log.warning("Пользователь %s не найден, уведомление о диалоге не отправлено", application["user_id"])
+        return
 
     embed = base_embed(
         title=f"Начат диалог — {application['job_title']}",
@@ -325,7 +332,10 @@ async def refresh_application_message(bot: discord.Client, application: dict) ->
     except discord.NotFound:
         return
 
-    user = bot.get_user(application["user_id"]) or await bot.fetch_user(application["user_id"])
+    user = await get_user_safe(bot, application["user_id"])
+    if user is None:
+        log.warning("Пользователь %s не найден, сообщение заявки не обновлено", application["user_id"])
+        return
     embed = build_application_embed(application, user)
 
     has_thread = bool(application.get("thread_id"))
@@ -419,9 +429,9 @@ class Reviews(commands.Cog):
             if application is None:
                 return
 
-            user = self.bot.get_user(application["user_id"]) or await self.bot.fetch_user(
-                application["user_id"]
-            )
+            user = await get_user_safe(self.bot, application["user_id"])
+            if user is None:
+                return
             embed = message_relay_embed(message.author, message.content, show_footer=False)
             try:
                 await user.send(embed=embed)
