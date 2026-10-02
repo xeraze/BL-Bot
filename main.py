@@ -8,6 +8,7 @@ from discord import app_commands
 from dotenv import load_dotenv
 
 from utils.error_handler import log_error
+from utils.i18n import get_lang, t
 from utils.permissions import MissingRoleError, RoleNotConfiguredError
 
 load_dotenv()
@@ -37,13 +38,14 @@ class BLCommandTree(app_commands.CommandTree):
         /,
     ) -> None:
         command_name = interaction.command.name if interaction.command else "unknown"
+        lang = get_lang(interaction)
 
         if isinstance(error, RoleNotConfiguredError):
             await log_error(
                 interaction,
                 error,
                 command_name,
-                "Эта команда не настроена на сервере. Сообщите администратору.",
+                t(lang, "err.not_configured"),
             )
             return
 
@@ -52,7 +54,7 @@ class BLCommandTree(app_commands.CommandTree):
                 interaction,
                 error,
                 command_name,
-                "У вас нет прав для использования этой команды.",
+                t(lang, "err.no_role"),
             )
             return
 
@@ -61,7 +63,7 @@ class BLCommandTree(app_commands.CommandTree):
                 interaction,
                 error,
                 command_name,
-                "Проверка перед выполнением команды не пройдена.",
+                t(lang, "err.check_failed"),
             )
             return
 
@@ -70,7 +72,7 @@ class BLCommandTree(app_commands.CommandTree):
                 interaction,
                 error,
                 command_name,
-                f"Отсутствует обязательный аргумент: {error.param.name}",
+                t(lang, "err.missing_arg", name=error.param.name),
             )
             return
 
@@ -79,7 +81,7 @@ class BLCommandTree(app_commands.CommandTree):
                 interaction,
                 error,
                 command_name,
-                f"Неправильно указан аргумент: {error}",
+                t(lang, "err.bad_arg", error=str(error)),
             )
             return
 
@@ -87,7 +89,7 @@ class BLCommandTree(app_commands.CommandTree):
             interaction,
             error,
             command_name,
-            "Произошла непредвиденная ошибка. Администраторы уведомлены.",
+            t(lang, "err.generic"),
         )
 
 

@@ -5,6 +5,8 @@ from typing import Optional
 
 import discord
 
+from utils.i18n import get_lang, t
+
 log = logging.getLogger("bl-bot")
 
 
@@ -53,7 +55,10 @@ async def log_error(
             log.error(f"Канал логов ({channel_id}) не найден или не является текстовым")
             return
 
-        user_name = getattr(interaction.user, "name", "Неизвестный пользователь")
+        lang = get_lang(interaction)
+        user_name = getattr(
+            interaction.user, "name", t(lang, "errlog.unknown_user")
+        )
         user_id = getattr(interaction.user, "id", "N/A")
         channel_name = getattr(interaction.channel, "name", "DM") if interaction.channel else "DM"
 
@@ -64,18 +69,22 @@ async def log_error(
             error_traceback = error_traceback[-1500:]
 
         embed = discord.Embed(
-            title=f"⚠️ Ошибка в команде: {command_name}",
-            description=f"**Пользователь:** {user_name} ({user_id})\n**Канал:** {channel_name}",
+            title=t(lang, "errlog.title", command=command_name),
+            description=(
+                t(lang, "errlog.user", name=user_name, id=user_id)
+                + "\n"
+                + t(lang, "errlog.channel", channel=channel_name)
+            ),
             color=discord.Color.red(),
         )
 
         embed.add_field(
-            name="📝 Сообщение об ошибке",
+            name=t(lang, "errlog.field"),
             value=f"```\n{error_traceback}\n```",
             inline=False,
         )
 
-        embed.set_footer(text=f"Команда: /{command_name}")
+        embed.set_footer(text=t(lang, "errlog.footer", command=command_name))
 
         await channel.send(embed=embed)
         log.error(

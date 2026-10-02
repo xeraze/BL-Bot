@@ -2,6 +2,8 @@ import json
 import uuid
 from pathlib import Path
 
+from utils.i18n import DEFAULT_LANG
+
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 IDEAS_FILE = DATA_DIR / "ideas.json"
 
@@ -38,6 +40,7 @@ def create_idea(
     author_name: str,
     author_avatar: str,
     text: str,
+    lang: str = DEFAULT_LANG,
 ) -> dict:
     record = {
         "id": uuid.uuid4().hex[:8],
@@ -45,6 +48,7 @@ def create_idea(
         "author_name": author_name,
         "author_avatar": author_avatar,
         "text": text,
+        "lang": lang,
         "status": "new",
         "reviewer_id": None,
         "reviewer_name": None,

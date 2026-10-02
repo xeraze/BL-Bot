@@ -5,7 +5,7 @@
 
   <!-- Заголовок -->
   <text x="40" y="54" font-size="26" font-weight="700" fill="#f2f3f5">ApplicationBoy vs BL Bot</text>
-  <text x="40" y="82" font-size="14" fill="#949ba4">Слева - универсальный бот для анкет и заявок, справа - уникальный бот для гибкого найма сотрудников</text>
+  <text x="40" y="82" font-size="14" fill="#949ba4">On the left is a versatile bot for profiles and applications; on the right is a unique bot for flexible hiring</text>
 
   <!-- Баннеры колонок -->
   <rect x="40" y="104" width="560" height="54" rx="8" fill="#4e5058"/>
@@ -21,50 +21,50 @@
     <rect x="40" y="178" width="560" height="64" rx="8" fill="#2b2d31" stroke="#3f4147"/>
     <circle cx="72" cy="210" r="14" fill="#4e5058"/>
     <text x="72" y="215" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">1</text>
-    <text x="100" y="206" font-size="15" font-weight="600" fill="#f2f3f5">Эмбед-меню в одном канале</text>
-    <text x="100" y="228" font-size="13" fill="#b5bac1">Эмбед с Select-меню с выбором анкеты</text>
+    <text x="100" y="206" font-size="15" font-weight="600" fill="#f2f3f5">Embed menu in a single channel</text>
+    <text x="100" y="228" font-size="13" fill="#b5bac1">Select menu for choosing a questionnaire</text>
 
     <path d="M320 248 V272 M314 266 L320 272 L326 266" stroke="#6c6f78" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 
     <rect x="40" y="278" width="560" height="64" rx="8" fill="#2b2d31" stroke="#3f4147"/>
     <circle cx="72" cy="310" r="14" fill="#4e5058"/>
     <text x="72" y="315" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">2</text>
-    <text x="100" y="306" font-size="15" font-weight="600" fill="#f2f3f5">Публикация заполненных анкет</text>
-    <text x="100" y="328" font-size="13" fill="#b5bac1">Embed с заполненной анкетой и меню выбора решения</text>
+    <text x="100" y="306" font-size="15" font-weight="600" fill="#f2f3f5">Publishing completed questionnaires</text>
+    <text x="100" y="328" font-size="13" fill="#b5bac1">Embed with a filled questionnaire and a decision menu</text>
 
     <path d="M320 348 V372 M314 366 L320 372 L326 366" stroke="#6c6f78" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 
     <rect x="40" y="378" width="560" height="64" rx="8" fill="#2b2d31" stroke="#3f4147"/>
     <circle cx="72" cy="410" r="14" fill="#4e5058"/>
     <text x="72" y="415" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">3</text>
-    <text x="100" y="406" font-size="15" font-weight="600" fill="#f2f3f5">Диалог в ветке после начала рассмотрения</text>
-    <text x="100" y="428" font-size="13" fill="#b5bac1">Пересылка сообщений: ветка под эмбедом ↔ ЛС участника</text>
+    <text x="100" y="406" font-size="15" font-weight="600" fill="#f2f3f5">Dialogue in the thread after the review begins</text>
+    <text x="100" y="428" font-size="13" fill="#b5bac1">Message forwarding: thread under the embed ↔ participant's PM</text>
 
     <path d="M320 448 V472 M314 466 L320 472 L326 466" stroke="#6c6f78" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 
     <rect x="40" y="478" width="560" height="64" rx="8" fill="#2b2d31" stroke="#3f4147"/>
     <circle cx="72" cy="510" r="14" fill="#4e5058"/>
     <text x="72" y="515" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">4</text>
-    <text x="100" y="506" font-size="15" font-weight="600" fill="#f2f3f5">После начала диалога 2 решения на выбор</text>
-    <text x="100" y="528" font-size="13" fill="#b5bac1">«Принять» или «Отклонить»</text>
+    <text x="100" y="506" font-size="15" font-weight="600" fill="#f2f3f5">After the dialogue begins, there are 2 options to choose from</text>
+    <text x="100" y="528" font-size="13" fill="#b5bac1">"Accept" or "Reject"</text>
 
     <path d="M320 548 V572 M314 566 L320 572 L326 566" stroke="#6c6f78" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 
     <rect x="40" y="578" width="560" height="64" rx="8" fill="#2b2d31" stroke="#3f4147"/>
     <circle cx="72" cy="610" r="14" fill="#4e5058"/>
     <text x="72" y="615" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">5</text>
-    <text x="100" y="606" font-size="15" font-weight="600" fill="#f2f3f5">Уведомление в ЛС</text>
-    <text x="100" y="628" font-size="13" fill="#b5bac1">Участник узнаёт об отправке, рассмотрении и решении</text>
+    <text x="100" y="606" font-size="15" font-weight="600" fill="#f2f3f5">DM notification</text>
+    <text x="100" y="628" font-size="13" fill="#b5bac1">The participant is notified of the submission, review, and decision</text>
 
     <path d="M320 648 V672 M314 666 L320 672 L326 666" stroke="#6c6f78" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 
     <!-- Чего нет -->
     <rect x="40" y="678" width="560" height="196" rx="8" fill="#35282b" stroke="#ed4245"/>
-    <text x="64" y="710" font-size="14" font-weight="700" fill="#ff8085">Чего нет у ApplicationBoy</text>
-    <text x="64" y="750" font-size="13" fill="#dbdee1"><tspan fill="#ed4245">✗</tspan>  Закрытый исходный код</text>
-    <text x="64" y="778" font-size="13" fill="#dbdee1"><tspan fill="#ed4245">✗</tspan>  Невозможность сделать форк</text>
-    <text x="64" y="806" font-size="13" fill="#dbdee1"><tspan fill="#ed4245">✗</tspan>  Отсутствие истории заявок</text>
-    <text x="64" y="834" font-size="13" fill="#dbdee1"><tspan fill="#ed4245">✗</tspan>  Гибкость лишь в универсальности, но нет специфики</text>
+    <text x="64" y="710" font-size="14" font-weight="700" fill="#ff8085">What ApplicationBoy Doesn't Have</text>
+    <text x="64" y="750" font-size="13" fill="#dbdee1"><tspan fill="#ed4245">✗</tspan>  No open source</text>
+    <text x="64" y="778" font-size="13" fill="#dbdee1"><tspan fill="#ed4245">✗</tspan>  Cannot be forked</text>
+    <text x="64" y="806" font-size="13" fill="#dbdee1"><tspan fill="#ed4245">✗</tspan>  No application history</text>
+    <text x="64" y="834" font-size="13" fill="#dbdee1"><tspan fill="#ed4245">✗</tspan>  Flexible only in a generic way, not specific</text>
   </g>
 
   <!-- ========== ПРАВАЯ КОЛОНКА ========== -->
@@ -72,59 +72,59 @@
     <rect x="640" y="178" width="560" height="64" rx="8" fill="#2b2d31" stroke="#3f4147"/>
     <circle cx="672" cy="210" r="14" fill="#23a55a"/>
     <text x="672" y="215" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">1</text>
-    <text x="700" y="206" font-size="15" font-weight="600" fill="#f2f3f5">Команда /bl работа — список вакансий в любом канале</text>
-    <text x="700" y="228" font-size="13" fill="#b5bac1">Актуальный список вакансий сервера в jobs.json</text>
+    <text x="700" y="206" font-size="15" font-weight="600" fill="#f2f3f5">The /vacancies command - live vacancy list in any channel</text>
+    <text x="700" y="228" font-size="13" fill="#b5bac1">Current list of server job openings in jobs.json</text>
 
     <path d="M920 248 V272 M914 266 L920 272 L926 266" stroke="#35885e" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 
     <rect x="640" y="278" width="560" height="64" rx="8" fill="#2b2d31" stroke="#3f4147"/>
     <circle cx="672" cy="310" r="14" fill="#23a55a"/>
     <text x="672" y="315" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">2</text>
-    <text x="700" y="306" font-size="15" font-weight="600" fill="#f2f3f5">Модальная форма</text>
-    <text x="700" y="328" font-size="13" fill="#b5bac1">Имя и возраст, опыт, портфолио, комментарий</text>
+    <text x="700" y="306" font-size="15" font-weight="600" fill="#f2f3f5">Modal form</text>
+    <text x="700" y="328" font-size="13" fill="#b5bac1">Name and age, experience, portfolio, comments</text>
 
     <path d="M920 348 V372 M914 366 L920 372 L926 366" stroke="#35885e" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 
     <rect x="640" y="378" width="560" height="64" rx="8" fill="#2b2d31" stroke="#3f4147"/>
     <circle cx="672" cy="410" r="14" fill="#23a55a"/>
     <text x="672" y="415" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">3</text>
-    <text x="700" y="406" font-size="15" font-weight="600" fill="#f2f3f5">Embed заявки</text>
-    <text x="700" y="428" font-size="13" fill="#b5bac1">ID заявки, аватар, описание и требования</text>
+    <text x="700" y="406" font-size="15" font-weight="600" fill="#f2f3f5">Application embed</text>
+    <text x="700" y="428" font-size="13" fill="#b5bac1">Application ID, avatar, description, and requirements</text>
 
     <path d="M920 448 V472 M914 466 L920 472 L926 466" stroke="#35885e" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 
     <rect x="640" y="478" width="560" height="64" rx="8" fill="#2b2d31" stroke="#3f4147"/>
     <circle cx="672" cy="510" r="14" fill="#23a55a"/>
     <text x="672" y="515" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">4</text>
-    <text x="700" y="506" font-size="15" font-weight="600" fill="#f2f3f5">Select-меню</text>
-    <text x="700" y="528" font-size="13" fill="#b5bac1">4 решения на выбор: Принять, Отклонить, Рассмотрение, Диалог</text>
+    <text x="700" y="506" font-size="15" font-weight="600" fill="#f2f3f5">Select menu</text>
+    <text x="700" y="528" font-size="13" fill="#b5bac1">4 options: Accept, Reject, In Review, Dialogue</text>
 
     <path d="M920 548 V572 M914 566 L920 572 L926 566" stroke="#35885e" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 
     <rect x="640" y="578" width="560" height="64" rx="8" fill="#2b2d31" stroke="#3f4147"/>
     <circle cx="672" cy="610" r="14" fill="#23a55a"/>
     <text x="672" y="615" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">5</text>
-    <text x="700" y="606" font-size="15" font-weight="600" fill="#f2f3f5">Рассмотрение</text>
-    <text x="700" y="628" font-size="13" fill="#b5bac1">Решение через модальное окно: embed обновляется, уведомление в ЛС</text>
+    <text x="700" y="606" font-size="15" font-weight="600" fill="#f2f3f5">Review</text>
+    <text x="700" y="628" font-size="13" fill="#b5bac1">Decision via modal: embed updates, DM notification</text>
 
     <path d="M920 648 V672 M914 666 L920 672 L926 666" stroke="#35885e" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 
     <rect x="640" y="678" width="560" height="64" rx="8" fill="#2b2d31" stroke="#3f4147"/>
     <circle cx="672" cy="710" r="14" fill="#23a55a"/>
     <text x="672" y="715" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">6</text>
-    <text x="700" y="706" font-size="15" font-weight="600" fill="#f2f3f5">Диалог</text>
-    <text x="700" y="728" font-size="13" fill="#b5bac1">Ветка под заявкой, сообщения в обе стороны (из ветки в ЛС, из ЛС в ветку)</text>
+    <text x="700" y="706" font-size="15" font-weight="600" fill="#f2f3f5">Dialogue</text>
+    <text x="700" y="728" font-size="13" fill="#b5bac1">Thread under the application, two-way messages (thread to DM)</text>
 
     <path d="M920 748 V772 M914 766 L920 772 L926 766" stroke="#35885e" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 
     <!-- Хранение и статусы -->
     <rect x="640" y="778" width="560" height="96" rx="8" fill="#24332c" stroke="#23a55a"/>
-    <text x="664" y="796" font-size="14" font-weight="700" fill="#7ee2ae">Открытый исходный код: <tspan fill="#f2f3f5">форк и доработка для любых целей</tspan></text>
-    <text x="664" y="818" font-size="14" font-weight="600" fill="#f2f3f5">Хранение в <tspan font-family="Consolas, monospace" fill="#7ee2ae">data/applications.json</tspan></text>
-    <text x="664" y="840" font-size="13" fill="#dbdee1">Поля: id, статус, проверяющий, причина, ветка</text>
-    <text x="664" y="862" font-size="13" fill="#dbdee1">Статусы: В Ожидании → На рассмотрении → Принята / Отклонена</text>
+    <text x="664" y="796" font-size="14" font-weight="700" fill="#7ee2ae">Open-source: <tspan fill="#f2f3f5">Fork and customization for any purpose</tspan></text>
+    <text x="664" y="818" font-size="14" font-weight="600" fill="#f2f3f5">Storage in <tspan font-family="Consolas, monospace" fill="#7ee2ae">data/applications.json</tspan></text>
+    <text x="664" y="840" font-size="13" fill="#dbdee1">Fields: id, status, reviewer, reason, branch</text>
+    <text x="664" y="862" font-size="13" fill="#dbdee1">Statuses: Pending - In Review - Accepted / Rejected</text>
   </g>
 
-  <text x="40" y="898" font-size="12" fill="#949ba4">Обработка заявок идентична - разница в подаче и акцентах</text>
-  <text x="640" y="898" font-size="12" fill="#949ba4">* "Начать диалог" - после статуса "На рассмотрении"</text>
+  <text x="40" y="898" font-size="12" fill="#949ba4">Application handling is identical - the difference is in submission and focus</text>
+  <text x="640" y="898" font-size="12" fill="#949ba4">* "Start dialogue" - after the "In Review" status</text>
 </svg>

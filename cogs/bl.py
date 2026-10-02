@@ -13,6 +13,14 @@ from utils.ideas import (
     load_ideas,
     save_idea,
 )
+from utils.i18n import (
+    DEFAULT_LANG,
+    coerce_lang,
+    get_lang,
+    lang_name,
+    set_lang,
+    t,
+)
 from utils.permissions import (
     get_applications_channel_id,
     has_role,
@@ -56,11 +64,11 @@ EMBED_TOTAL_BUDGET = 5900
 JOB_SEPARATOR = "\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
 
 
-def format_job_block(index: int, job: dict) -> str:
+def format_job_block(index: int, job: dict, lang: str = DEFAULT_LANG) -> str:
     requirements = _job_requirements(job)
     block = f"**{index}. {job['title']}**\n{job['description']}"
     if requirements:
-        block += f"\n\n**Требования:**\n{requirements}"
+        block += f"\n\n{t(lang, 'jobs.req_header')}\n{requirements}"
     return block
 
 
@@ -68,19 +76,16 @@ def _split_text(text: str, limit: int = MAX_EMBED_FIELD) -> list[str]:
     return [text[i : i + limit] for i in range(0, len(text), limit)]
 
 
-def build_jobs_embed() -> discord.Embed:
+def build_jobs_embed(lang: str = DEFAULT_LANG) -> discord.Embed:
     jobs = load_jobs()
 
     embed = base_embed(
-        title="📋 Вакансии студии",
-        description=(
-            "Ниже — открытые позиции в студии.\n"
-            "Выберите должность в меню под сообщением, чтобы подать заявку."
-        ),
+        title=t(lang, "jobs.title"),
+        description=t(lang, "jobs.desc"),
     )
 
     if not jobs:
-        embed.description = "На данный момент открытых вакансий нет. Загляните позже!"
+        embed.description = t(lang, "jobs.empty")
         return embed
 
     head_chars = len(embed.title) + len(embed.description)
@@ -90,7 +95,7 @@ def build_jobs_embed() -> discord.Embed:
     stopped = False
 
     for index, job in enumerate(jobs, start=1):
-        for part in _split_text(format_job_block(index, job)):
+        for part in _split_text(format_job_block(index, job, lang)):
             piece = part if not current else JOB_SEPARATOR + part
             if len(current) + len(piece) > MAX_EMBED_FIELD:
                 fields.append(current)
@@ -108,45 +113,60 @@ def build_jobs_embed() -> discord.Embed:
         fields.append(current)
 
     for position, value in enumerate(fields):
-        name = "Открытые вакансии" if position == 0 else "Открытые вакансии (продолжение)"
+        name = (
+            t(lang, "jobs.field")
+            if position == 0
+            else t(lang, "jobs.field_more")
+        )
         embed.add_field(name=name, value=value, inline=False)
 
-    footer = f"Всего позиций: {len(jobs)}"
+    footer = t(lang, "jobs.footer_total", count=len(jobs))
     if shown < len(jobs):
-        footer += f" · показано {shown}, уберите лишние через /bl уработа"
+        footer += t(lang, "jobs.footer_shown", shown=shown)
     embed.set_footer(text=footer)
     return embed
 
 
-class NewsModal(discord.ui.Modal, title="Публикация новости"):
+class NewsModal(discord.ui.Modal, title="Publish news"):
     title_input = discord.ui.TextInput(
-        label="Название новости",
-        placeholder="Заголовок новости...",
+        label="News title",
+        placeholder="News headline...",
         max_length=256,
         required=True,
     )
     description_input = discord.ui.TextInput(
-        label="Описание новости",
-        placeholder="Текст новости...",
+        label="News description",
+        placeholder="News text...",
         style=discord.TextStyle.paragraph,
         max_length=4000,
         required=True,
     )
     image_input = discord.ui.TextInput(
-        label="Изображение (необязательно)",
+        label="Image (optional)",
         placeholder="https://example.com/image.png",
         required=False,
         max_length=500,
     )
     pings_input = discord.ui.TextInput(
-        label="Пинги ролей (необязательно)",
+        label="Role pings (optional)",
         placeholder="<@&1234>, <@&5678>",
         style=discord.TextStyle.paragraph,
         required=False,
         max_length=200,
     )
 
+    def __init__(self, lang: str = DEFAULT_LANG) -> None:
+        super().__init__(title=t(lang, "news.modal_title"))
+        self.lang = lang
+        self.title_input.label = t(lang, "news.label_title")
+        self.title_input.placeholder = t(lang, "news.ph_title")
+        self.description_input.label = t(lang, "news.label_desc")
+        self.description_input.placeholder = t(lang, "news.ph_desc")
+        self.image_input.label = t(lang, "news.label_image")
+        self.pings_input.label = t(lang, "news.label_pings")
+
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        lang = self.lang
         embed = base_embed(
             title=self.title_input.value,
             description=self.description_input.value,
@@ -156,7 +176,7 @@ class NewsModal(discord.ui.Modal, title="Публикация новости"):
         if image_url:
             if not image_url.startswith(("http://", "https://")):
                 await interaction.response.send_message(
-                    "Ссылка на изображение должна начинаться с `http://` или `https://`.",
+                    t(lang, "news.bad_link"),
                     ephemeral=True,
                 )
                 return
@@ -164,7 +184,7 @@ class NewsModal(discord.ui.Modal, title="Публикация новости"):
 
         if interaction.channel is None:
             await interaction.response.send_message(
-                "Не удалось определить канал для публикации.",
+                t(lang, "news.no_channel"),
                 ephemeral=True,
             )
             return
@@ -177,7 +197,7 @@ class NewsModal(discord.ui.Modal, title="Публикация новости"):
                 match = re.fullmatch(r"<@&([0-9]+)>", item)
                 if not match:
                     await interaction.response.send_message(
-                        "Пинги должны быть в формате `<@&1234>` через запятую, до 5 ролей.",
+                        t(lang, "news.bad_pings"),
                         ephemeral=True,
                     )
                     return
@@ -186,7 +206,7 @@ class NewsModal(discord.ui.Modal, title="Публикация новости"):
             mentions = list(dict.fromkeys(mentions))
             if len(mentions) > 5:
                 await interaction.response.send_message(
-                    "Можно указать не более 5 пинг ролей.",
+                    t(lang, "news.too_many_pings"),
                     ephemeral=True,
                 )
                 return
@@ -201,53 +221,62 @@ class NewsModal(discord.ui.Modal, title="Публикация новости"):
                 await interaction.channel.send(embed=embed)
         except (discord.Forbidden, discord.HTTPException):
             await interaction.followup.send(
-                "❌ Не удалось опубликовать новость в этом канале. Проверьте права бота.",
+                t(lang, "news.publish_fail"),
                 ephemeral=True,
             )
             return
 
         await interaction.followup.send(
-            "✅ Новость опубликована в канал.",
+            t(lang, "news.published"),
             ephemeral=True,
         )
 
 
 class NewsEditButton(discord.ui.Button):
-    def __init__(self) -> None:
+    def __init__(self, lang: str = DEFAULT_LANG) -> None:
         super().__init__(
-            label="Изменить текст",
+            label=t(lang, "news.edit_button"),
             style=discord.ButtonStyle.primary,
             emoji="🎨",
         )
+        self.lang = lang
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        await interaction.response.send_modal(NewsModal())
+        await interaction.response.send_modal(NewsModal(self.lang))
 
 
 class NewsPreviewView(discord.ui.View):
-    def __init__(self) -> None:
+    def __init__(self, lang: str = DEFAULT_LANG) -> None:
         super().__init__(timeout=300)
-        self.add_item(NewsEditButton())
+        self.add_item(NewsEditButton(lang))
 
 
-class IdeaStatusReasonModal(discord.ui.Modal, title="Причина (необязательно)"):
+class IdeaStatusReasonModal(discord.ui.Modal, title="Reason (optional)"):
     reason = discord.ui.TextInput(
-        label="Причина",
+        label="Reason",
         style=discord.TextStyle.paragraph,
         required=False,
         max_length=1000,
-        placeholder="Укажите причину принятия или отклонения (необязательно)",
+        placeholder="State the reason for accepting or rejecting (optional)",
     )
 
-    def __init__(self, idea_view: "IdeaApprovalView", action: str) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        idea_view: "IdeaApprovalView",
+        action: str,
+        lang: str = DEFAULT_LANG,
+    ) -> None:
+        super().__init__(title=t(lang, "common.reason_title"))
+        self.lang = lang
+        self.reason.label = t(lang, "common.reason_label")
+        self.reason.placeholder = t(lang, "common.reason_ph")
         self.idea_view = idea_view
         self.action = action
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         if self.idea_view is None:
             await interaction.response.send_message(
-                "Не удалось обработать решение.",
+                t(get_lang(interaction), "idea.decision_fail"),
                 ephemeral=True,
             )
             return
@@ -272,7 +301,7 @@ class IdeaReviewButton(discord.ui.Button):
         view = self.view
         if view is None or not isinstance(view, IdeaApprovalView):
             await interaction.response.send_message(
-                "Не удалось обработать решение.",
+                t(get_lang(interaction), "idea.decision_fail"),
                 ephemeral=True,
             )
             return
@@ -281,18 +310,20 @@ class IdeaReviewButton(discord.ui.Button):
 
 
 class IdeaApprovalView(discord.ui.View):
-    STATUS_LABELS = {
-        "new": "Новая идея",
-        "reviewing": "На рассмотрении",
-        "accepted": "Принята",
-        "rejected": "Отклонена",
-        "dialogue": "Диалог начат",
-    }
+    STATUS_KEYS = frozenset(
+        {"new", "reviewing", "accepted", "rejected", "dialogue"}
+    )
 
-    def __init__(self, bot: discord.Client, record: dict) -> None:
+    def __init__(
+        self,
+        bot: discord.Client,
+        record: dict,
+        lang: str = DEFAULT_LANG,
+    ) -> None:
         super().__init__(timeout=None)
         self.bot = bot
         self.record = record
+        self.lang = lang
         self._rebuild_buttons()
 
     @property
@@ -303,17 +334,26 @@ class IdeaApprovalView(discord.ui.View):
     def idea_text(self) -> str:
         return self.record["text"]
 
+    def status_label(self, lang: str) -> str:
+        status = self.record["status"]
+        return (
+            t(lang, f"idea.status.{status}")
+            if status in self.STATUS_KEYS
+            else status
+        )
+
     def _rebuild_buttons(self) -> None:
+        lang = self.lang
         self.clear_items()
         status = self.record["status"]
         if status == "new":
-            self.add_item(IdeaReviewButton(self.idea_id, "Принять", discord.ButtonStyle.success, "accept"))
-            self.add_item(IdeaReviewButton(self.idea_id, "Отклонить", discord.ButtonStyle.danger, "reject"))
-            self.add_item(IdeaReviewButton(self.idea_id, "На рассмотрении", discord.ButtonStyle.secondary, "reviewing"))
+            self.add_item(IdeaReviewButton(self.idea_id, t(lang, "common.accept"), discord.ButtonStyle.success, "accept"))
+            self.add_item(IdeaReviewButton(self.idea_id, t(lang, "common.reject"), discord.ButtonStyle.danger, "reject"))
+            self.add_item(IdeaReviewButton(self.idea_id, t(lang, "common.reviewing"), discord.ButtonStyle.secondary, "reviewing"))
         else:
-            self.add_item(IdeaReviewButton(self.idea_id, "Принять", discord.ButtonStyle.success, "accept"))
-            self.add_item(IdeaReviewButton(self.idea_id, "Отклонить", discord.ButtonStyle.danger, "reject"))
-            dialogue = IdeaReviewButton(self.idea_id, "Начать диалог", discord.ButtonStyle.secondary, "dialogue")
+            self.add_item(IdeaReviewButton(self.idea_id, t(lang, "common.accept"), discord.ButtonStyle.success, "accept"))
+            self.add_item(IdeaReviewButton(self.idea_id, t(lang, "common.reject"), discord.ButtonStyle.danger, "reject"))
+            dialogue = IdeaReviewButton(self.idea_id, t(lang, "common.start_dialogue"), discord.ButtonStyle.secondary, "dialogue")
             dialogue.disabled = status != "reviewing"
             self.add_item(dialogue)
         if self.record.get("decision_made"):
@@ -326,26 +366,31 @@ class IdeaApprovalView(discord.ui.View):
         for item in self.children:
             item.disabled = True
 
-    def build_embed(self) -> discord.Embed:
+    def build_embed(self, lang: str | None = None) -> discord.Embed:
+        lang = self.lang if lang is None else lang
         embed = base_embed(
-            title="Новая идея",
+            title=t(lang, "idea.embed_title"),
             description=self.idea_text[:4096],
         )
-        embed.add_field(name="От:", value=f"<@{self.record['author_id']}>", inline=False)
         embed.add_field(
-            name="Статус:",
-            value=self.STATUS_LABELS.get(self.record["status"], self.record["status"]),
+            name=t(lang, "idea.field_from"),
+            value=f"<@{self.record['author_id']}>",
+            inline=False,
+        )
+        embed.add_field(
+            name=t(lang, "idea.field_status"),
+            value=self.status_label(lang),
             inline=False,
         )
         if self.record.get("reviewer_id"):
             embed.add_field(
-                name="Выполнил:",
+                name=t(lang, "idea.field_reviewer"),
                 value=f"<@{self.record['reviewer_id']}>",
                 inline=False,
             )
         if self.record.get("review_reason"):
             embed.add_field(
-                name="Причина:",
+                name=t(lang, "idea.field_reason"),
                 value=self.record["review_reason"][:1024],
                 inline=False,
             )
@@ -359,24 +404,27 @@ class IdeaApprovalView(discord.ui.View):
         *,
         reason_collected: bool = False,
     ) -> None:
+        lang = get_lang(interaction)
+        self.lang = lang
+
         if not isinstance(interaction.user, discord.Member) or not member_has_role(
             interaction.user, "IDEA_APPROVER_ROLE_ID"
         ):
             await interaction.response.send_message(
-                "У вас нет прав для проверки идей.",
+                t(lang, "idea.no_permission"),
                 ephemeral=True,
             )
             return
 
         if self.record.get("decision_made"):
             await interaction.response.send_message(
-                "По этой идее уже принято решение.",
+                t(lang, "idea.already_decided"),
                 ephemeral=True,
             )
             return
 
         if action in ("accept", "reject") and reason is None and not reason_collected:
-            await interaction.response.send_modal(IdeaStatusReasonModal(self, action))
+            await interaction.response.send_modal(IdeaStatusReasonModal(self, action, lang))
             return
 
         if action == "accept":
@@ -389,7 +437,7 @@ class IdeaApprovalView(discord.ui.View):
             )
             self._save()
             self._rebuild_buttons()
-            await self._finalize_decision(interaction, accepted=True)
+            await self._finalize_decision(interaction, accepted=True, lang=lang)
             return
 
         if action == "reject":
@@ -402,7 +450,7 @@ class IdeaApprovalView(discord.ui.View):
             )
             self._save()
             self._rebuild_buttons()
-            await self._finalize_decision(interaction, accepted=False)
+            await self._finalize_decision(interaction, accepted=False, lang=lang)
             return
 
         if action == "reviewing":
@@ -413,11 +461,12 @@ class IdeaApprovalView(discord.ui.View):
             )
             self._save()
             self._rebuild_buttons()
-            await interaction.response.edit_message(embed=self.build_embed(), view=self)
+            await interaction.response.edit_message(embed=self.build_embed(lang), view=self)
+            author_lang = coerce_lang(self.record.get("lang"))
             await self._notify_author(
                 interaction.client,
-                "Ваша идея отправлена на рассмотрение",
-                "Проверяющий начал рассматривать вашу идею. Статус будет обновлён позже.",
+                t(author_lang, "idea.reviewing_dm_title"),
+                t(author_lang, "idea.reviewing_dm_desc"),
                 interaction.guild,
             )
             return
@@ -425,14 +474,14 @@ class IdeaApprovalView(discord.ui.View):
         if action == "dialogue":
             if self.record["status"] != "reviewing":
                 await interaction.response.send_message(
-                    "Сначала поставьте идею на рассмотрение.",
+                    t(lang, "idea.need_reviewing"),
                     ephemeral=True,
                 )
                 return
-            thread = await self._create_dialogue_thread(interaction)
+            thread = await self._create_dialogue_thread(interaction, lang)
             if thread is None:
                 await interaction.response.send_message(
-                    "Не удалось создать ветку диалога.",
+                    t(lang, "idea.thread_fail"),
                     ephemeral=True,
                 )
                 return
@@ -443,21 +492,28 @@ class IdeaApprovalView(discord.ui.View):
             )
             self._save()
             self._rebuild_buttons()
-            await interaction.response.edit_message(embed=self.build_embed(), view=self)
+            await interaction.response.edit_message(embed=self.build_embed(lang), view=self)
+            author_lang = coerce_lang(self.record.get("lang"))
             await self._notify_author(
                 interaction.client,
-                "Начат диалог по вашей идее",
-                "Проверяющий начал диалог по вашей идее. Все дальнейшее взаимодействие с проверяющим будет происходить в этой ветке. Ваши сообщения логгируются!",
+                t(author_lang, "idea.dialogue_dm_title"),
+                t(author_lang, "idea.dialogue_dm_desc"),
                 interaction.guild,
             )
             return
 
-    async def _create_dialogue_thread(self, interaction: discord.Interaction) -> discord.Thread | None:
+    async def _create_dialogue_thread(
+        self,
+        interaction: discord.Interaction,
+        lang: str = DEFAULT_LANG,
+    ) -> discord.Thread | None:
         if interaction.message is None:
             return None
 
         try:
-            thread_name = f"Диалог — идея от {self.record['author_name']}"[:100]
+            thread_name = t(
+                lang, "idea.thread_name", author=self.record["author_name"]
+            )[:100]
             thread = await interaction.message.create_thread(
                 name=thread_name,
                 auto_archive_duration=10080,
@@ -471,10 +527,9 @@ class IdeaApprovalView(discord.ui.View):
         IDEA_USER_BY_THREAD[thread.id] = self.record["author_id"]
 
         welcome = base_embed(
-            title="Начат диалог",
-            description=(
-                f"Вы начали диалог с {interaction.user.mention} по его идее.\n\n"
-                "Сообщения автора из ЛС будут приходить сюда, ваши сообщения будут отправляться пользователю в ЛС."
+            title=t(lang, "idea.welcome_title"),
+            description=t(
+                lang, "idea.welcome_desc", reviewer=interaction.user.mention
             ),
         )
         await thread.send(embed=welcome)
@@ -492,12 +547,13 @@ class IdeaApprovalView(discord.ui.View):
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 return
 
+        lang = coerce_lang(self.record.get("lang"))
         public_embed = base_embed(
-            title="Новая идея",
+            title=t(lang, "idea.embed_title"),
             description=self.idea_text[:4096],
         )
         public_embed.set_author(
-            name=f"От: {self.record['author_name']}",
+            name=t(lang, "idea.public_author", name=self.record["author_name"]),
             icon_url=self.record["author_avatar"],
         )
         message = await idea_channel.send(
@@ -511,16 +567,22 @@ class IdeaApprovalView(discord.ui.View):
         self,
         interaction: discord.Interaction,
         accepted: bool,
+        lang: str = DEFAULT_LANG,
     ) -> None:
-        status_text = "принята" if accepted else "отклонена"
+        content_key = "idea.accepted_content" if accepted else "idea.rejected_content"
         await interaction.response.edit_message(
-            content=f"✅ Идея {status_text} {interaction.user.mention}.",
-            embed=self.build_embed(),
+            content=t(lang, content_key, mention=interaction.user.mention),
+            embed=self.build_embed(lang),
             view=self,
         )
-        title = "Ваша идея принята" if accepted else "Ваша идея отклонена"
-        description = (
-            "Ваша идея принята. Спасибо за ваш вклад!" if accepted else "Ваша идея отклонена. Присылайте другие идеи, мы всегда рады новым предложениям!"
+        author_lang = coerce_lang(self.record.get("lang"))
+        title = t(
+            author_lang,
+            "idea.accepted_title" if accepted else "idea.rejected_title",
+        )
+        description = t(
+            author_lang,
+            "idea.accepted_desc" if accepted else "idea.rejected_desc",
         )
         if accepted:
             await self._publish_accepted_idea(interaction)
@@ -538,21 +600,24 @@ class IdeaApprovalView(discord.ui.View):
         description: str,
         guild: discord.Guild | None,
     ) -> None:
+        lang = coerce_lang(self.record.get("lang"))
         embed = base_embed(title=title, description=description)
         if self.record.get("review_reason"):
             embed.add_field(
-                name="Причина:",
+                name=t(lang, "idea.field_reason"),
                 value=self.record["review_reason"][:1024],
                 inline=False,
             )
         if self.record.get("reviewer_name"):
-            embed.set_footer(text=f"Проверил: {self.record['reviewer_name']}")
+            embed.set_footer(
+                text=t(lang, "idea.reviewed_by", name=self.record["reviewer_name"])
+            )
         view = None
         if guild is not None:
             view = discord.ui.View(timeout=None)
             view.add_item(
                 discord.ui.Button(
-                    label=f"Отправлено с {guild.name}",
+                    label=t(lang, "common.sent_from", guild=guild.name),
                     style=discord.ButtonStyle.secondary,
                     disabled=True,
                 )
@@ -566,27 +631,37 @@ class IdeaApprovalView(discord.ui.View):
             pass
 
 
-class AddJobModal(discord.ui.Modal, title="Добавление вакансии"):
+class AddJobModal(discord.ui.Modal, title="Add vacancy"):
     title_input = discord.ui.TextInput(
-        label="Название должности",
-        placeholder="Например: Разработчик, Дизайнер и т.д",
+        label="Job title",
+        placeholder="E.g.: Developer, Designer, etc.",
         max_length=100,
         required=True,
     )
     description_input = discord.ui.TextInput(
-        label="Описание должности",
-        placeholder="Обязанности, условия, что предстоит делать...",
+        label="Job description",
+        placeholder="Responsibilities, conditions, what the job involves...",
         style=discord.TextStyle.paragraph,
         max_length=1000,
         required=True,
     )
     requirements_input = discord.ui.TextInput(
-        label="Требования",
-        placeholder="Опыт, навыки, что нужно от кандидата...",
+        label="Requirements",
+        placeholder="Experience, skills, what's needed from the candidate...",
         style=discord.TextStyle.paragraph,
         max_length=1000,
         required=True,
     )
+
+    def __init__(self, lang: str = DEFAULT_LANG) -> None:
+        super().__init__(title=t(lang, "vadd.modal_title"))
+        self.lang = lang
+        self.title_input.label = t(lang, "vadd.label_title")
+        self.title_input.placeholder = t(lang, "vadd.ph_title")
+        self.description_input.label = t(lang, "vadd.label_desc")
+        self.description_input.placeholder = t(lang, "vadd.ph_desc")
+        self.requirements_input.label = t(lang, "vadd.label_req")
+        self.requirements_input.placeholder = t(lang, "vadd.ph_req")
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         job = add_job(
@@ -595,39 +670,42 @@ class AddJobModal(discord.ui.Modal, title="Добавление вакансии
             requirements=self.requirements_input.value,
         )
         await interaction.response.send_message(
-            f"✅ Вакансия **{job['title']}** добавлена в список.",
+            t(self.lang, "vadd.added", title=job["title"]),
             ephemeral=True,
         )
 
 
 class JobApplicationModal(discord.ui.Modal):
-    def __init__(self, job: dict) -> None:
-        super().__init__(title=f"Заявка: {job['title'][:37]}")
+    def __init__(self, job: dict, lang: str = DEFAULT_LANG) -> None:
+        empty_title = t(lang, "apply.modal_title", title="")
+        title_slot = max(1, 45 - len(empty_title))
+        super().__init__(title=t(lang, "apply.modal_title", title=job["title"][:title_slot]))
         self.job = job
+        self.lang = lang
 
         self.name_age = discord.ui.TextInput(
-            label="Имя и возраст",
-            placeholder="Например: Алексей, 18 лет",
+            label=t(lang, "apply.label_name_age"),
+            placeholder=t(lang, "apply.ph_name_age"),
             max_length=100,
             required=True,
         )
         self.experience = discord.ui.TextInput(
-            label="Опыт",
-            placeholder="Расскажите о своём опыте в данной сфере...",
+            label=t(lang, "apply.label_experience"),
+            placeholder=t(lang, "apply.ph_experience"),
             style=discord.TextStyle.paragraph,
             max_length=1000,
             required=True,
         )
         self.portfolio = discord.ui.TextInput(
-            label="Портфолио / контакты",
-            placeholder="Ссылки на работы, Discord, Telegram...",
+            label=t(lang, "apply.label_portfolio"),
+            placeholder=t(lang, "apply.ph_portfolio"),
             style=discord.TextStyle.paragraph,
             max_length=500,
             required=False,
         )
         self.comment = discord.ui.TextInput(
-            label="Комментарий (необязательно)",
-            placeholder="Почему хотите к нам, дополнительная информация...",
+            label=t(lang, "apply.label_comment"),
+            placeholder=t(lang, "apply.ph_comment"),
             style=discord.TextStyle.paragraph,
             max_length=500,
             required=False,
@@ -639,10 +717,11 @@ class JobApplicationModal(discord.ui.Modal):
         self.add_item(self.comment)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        lang = self.lang
         channel_id = get_applications_channel_id()
         if channel_id is None:
             await interaction.response.send_message(
-                "Канал для заявок не настроен. Сообщите STAFF.",
+                t(lang, "apply.no_channel"),
                 ephemeral=True,
             )
             return
@@ -650,7 +729,7 @@ class JobApplicationModal(discord.ui.Modal):
         channel = interaction.client.get_channel(channel_id)
         if channel is None:
             await interaction.response.send_message(
-                "Канал для заявок не найден. Сообщите STAFF.",
+                t(lang, "apply.channel_missing"),
                 ephemeral=True,
             )
             return
@@ -669,9 +748,10 @@ class JobApplicationModal(discord.ui.Modal):
             experience=self.experience.value,
             portfolio=portfolio,
             comment=comment,
+            lang=lang,
         )
 
-        embed = build_application_embed(application, interaction.user)
+        embed = build_application_embed(application, interaction.user, lang)
         review_view = ApplicationReviewView(application["id"], "new")
         interaction.client.add_view(review_view)
         message = await channel.send(embed=embed, view=review_view)
@@ -683,13 +763,13 @@ class JobApplicationModal(discord.ui.Modal):
         )
 
         await interaction.response.send_message(
-            f"✅ Заявка на должность **{job['title']}** отправлена. Ожидайте ответа.",
+            t(lang, "apply.sent", title=job["title"]),
             ephemeral=True,
         )
 
 
 class ApplyJobSelect(discord.ui.Select):
-    def __init__(self, jobs: list[dict]) -> None:
+    def __init__(self, jobs: list[dict], lang: str = DEFAULT_LANG) -> None:
         options = [
             discord.SelectOption(
                 label=job["title"][:100],
@@ -699,7 +779,7 @@ class ApplyJobSelect(discord.ui.Select):
             for job in jobs[:25]
         ]
         super().__init__(
-            placeholder="Выберите должность для подачи заявки",
+            placeholder=t(lang, "apply.select_ph"),
             options=options,
             min_values=1,
             max_values=1,
@@ -708,17 +788,19 @@ class ApplyJobSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         job = self.jobs[self.values[0]]
-        await interaction.response.send_modal(JobApplicationModal(job))
+        await interaction.response.send_modal(
+            JobApplicationModal(job, get_lang(interaction))
+        )
 
 
 class ApplyJobView(discord.ui.View):
-    def __init__(self, jobs: list[dict]) -> None:
+    def __init__(self, jobs: list[dict], lang: str = DEFAULT_LANG) -> None:
         super().__init__(timeout=300)
-        self.add_item(ApplyJobSelect(jobs))
+        self.add_item(ApplyJobSelect(jobs, lang))
 
 
 class DeleteJobSelect(discord.ui.Select):
-    def __init__(self, jobs: list[dict]) -> None:
+    def __init__(self, jobs: list[dict], lang: str = DEFAULT_LANG) -> None:
         options = [
             discord.SelectOption(
                 label=job["title"][:100],
@@ -730,71 +812,109 @@ class DeleteJobSelect(discord.ui.Select):
             for job in jobs[:25]
         ]
         super().__init__(
-            placeholder="Выберите вакансию для удаления",
+            placeholder=t(lang, "vdel.select_ph"),
             options=options,
             min_values=1,
             max_values=1,
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        lang = get_lang(interaction)
         job_id = self.values[0]
         removed = remove_job(job_id)
 
         if removed is None:
             await interaction.response.send_message(
-                "Вакансия уже была удалена или не найдена. Обновите список и попробуйте снова.",
+                t(lang, "vdel.not_found"),
                 ephemeral=True,
             )
             return
 
         await interaction.response.send_message(
-            f"🗑️ Вакансия **{removed['title']}** удалена из списка.",
+            t(lang, "vdel.removed", title=removed["title"]),
             ephemeral=True,
         )
 
 
 class DeleteJobView(discord.ui.View):
-    def __init__(self, jobs: list[dict]) -> None:
+    def __init__(self, jobs: list[dict], lang: str = DEFAULT_LANG) -> None:
         super().__init__(timeout=300)
-        self.add_item(DeleteJobSelect(jobs))
+        self.add_item(DeleteJobSelect(jobs, lang))
 
 
-class BLGroup(app_commands.Group):
-    """Команды BL Bot."""
+class BL(commands.Cog):
+    """Команды студии BL."""
 
-    def __init__(self) -> None:
-        super().__init__(name="bl", description="Команды студии BL")
-
-    @app_commands.command(
-        name="новости",
-        description="Опубликовать новость в канал",
+    vacancy = app_commands.Group(
+        name="vacancy",
+        description="Manage studio vacancies",
     )
-    @has_role("ROLE_NEWS")
-    async def news(self, interaction: discord.Interaction) -> None:
-        preview = base_embed(
-            title="Публикация новости",
-            description=(
-                "Нажмите кнопку ниже, чтобы заполнить поля новости.\n"
-                "После отправки формы бот опубликует эмбед в этот канал.\n\n"
-                "*Заполните все поля перед отправкой — предпросмотр не обновляется автоматически.*"
-            ),
+
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot = bot
+
+    @vacancy.command(
+        name="add",
+        description="Add a vacancy to the list (not published)",
+    )
+    @has_role("ROLE_JOBS_MANAGE")
+    async def vacancy_add(self, interaction: discord.Interaction) -> None:
+        await interaction.response.send_modal(AddJobModal(get_lang(interaction)))
+
+    @vacancy.command(
+        name="del",
+        description="Remove a vacancy from the list",
+    )
+    @has_role("ROLE_JOBS_MANAGE")
+    async def vacancy_del(self, interaction: discord.Interaction) -> None:
+        lang = get_lang(interaction)
+        jobs = load_jobs()
+
+        if not jobs:
+            await interaction.response.send_message(
+                t(lang, "vdel.empty"),
+                ephemeral=True,
+            )
+            return
+
+        embed = base_embed(
+            title=t(lang, "vdel.embed_title"),
+            description=t(lang, "vdel.embed_desc"),
         )
         await interaction.response.send_message(
-            embed=preview,
-            view=NewsPreviewView(),
+            embed=embed,
+            view=DeleteJobView(jobs, lang),
             ephemeral=True,
         )
 
     @app_commands.command(
-        name="идея",
-        description="Отправить идею на рассмотрение",
+        name="post",
+        description="Publish a news post in this channel",
     )
-    @app_commands.describe(idea="Текст идеи")
+    @has_role("ROLE_NEWS")
+    async def post(self, interaction: discord.Interaction) -> None:
+        lang = get_lang(interaction)
+        preview = base_embed(
+            title=t(lang, "news.preview_title"),
+            description=t(lang, "news.preview_desc"),
+        )
+        await interaction.response.send_message(
+            embed=preview,
+            view=NewsPreviewView(lang),
+            ephemeral=True,
+        )
+
+    @app_commands.command(
+        name="idea",
+        description="Submit an idea for review",
+    )
+    @app_commands.describe(idea="Idea text")
     async def idea(self, interaction: discord.Interaction, idea: str) -> None:
+        lang = get_lang(interaction)
         review_channel_id = get_idea_review_channel_id()
         if review_channel_id is None:
             await interaction.response.send_message(
-                "Канал для проверки идей не настроен. Сообщите STAFF.",
+                t(lang, "idea.no_channel"),
                 ephemeral=True,
             )
             return
@@ -808,7 +928,7 @@ class BLGroup(app_commands.Group):
 
         if review_channel is None:
             await interaction.response.send_message(
-                "Канал для проверки идей не найден. Сообщите STAFF.",
+                t(lang, "idea.channel_missing"),
                 ephemeral=True,
             )
             return
@@ -816,7 +936,7 @@ class BLGroup(app_commands.Group):
         idea_text = idea.strip()
         if not idea_text:
             await interaction.response.send_message(
-                "Текст идеи не может быть пустым.",
+                t(lang, "idea.empty"),
                 ephemeral=True,
             )
             return
@@ -826,57 +946,26 @@ class BLGroup(app_commands.Group):
             author_name=interaction.user.display_name,
             author_avatar=interaction.user.display_avatar.url,
             text=idea_text,
+            lang=lang,
         )
-        view = IdeaApprovalView(interaction.client, record)
-        message = await review_channel.send(embed=view.build_embed(), view=view)
+        view = IdeaApprovalView(interaction.client, record, lang)
+        message = await review_channel.send(embed=view.build_embed(lang), view=view)
         record.update(channel_id=review_channel.id, message_id=message.id)
         save_idea(record)
 
         await interaction.response.send_message(
-            "✅ Ваша идея отправлена на рассмотрение. Ожидайте ответа.",
+            t(lang, "idea.sent"),
             ephemeral=True,
         )
 
     @app_commands.command(
-        name="дработа",
-        description="Добавить вакансию в список (без публикации)",
+        name="vacancies",
+        description="View vacancies and apply",
     )
-    @has_role("ROLE_JOBS_MANAGE")
-    async def add_job(self, interaction: discord.Interaction) -> None:
-        await interaction.response.send_modal(AddJobModal())
-
-    @app_commands.command(
-        name="уработа",
-        description="Удалить вакансию из списка",
-    )
-    @has_role("ROLE_JOBS_MANAGE")
-    async def remove_job_cmd(self, interaction: discord.Interaction) -> None:
+    async def vacancies(self, interaction: discord.Interaction) -> None:
+        lang = get_lang(interaction)
         jobs = load_jobs()
-
-        if not jobs:
-            await interaction.response.send_message(
-                "Список вакансий пуст — удалять нечего.",
-                ephemeral=True,
-            )
-            return
-
-        embed = base_embed(
-            title="Удаление вакансии",
-            description="Выберите должность из списка ниже, которую нужно убрать.",
-        )
-        await interaction.response.send_message(
-            embed=embed,
-            view=DeleteJobView(jobs),
-            ephemeral=True,
-        )
-
-    @app_commands.command(
-        name="работа",
-        description="Посмотреть вакансии и подать заявку",
-    )
-    async def list_jobs(self, interaction: discord.Interaction) -> None:
-        jobs = load_jobs()
-        embed = build_jobs_embed()
+        embed = build_jobs_embed(lang)
 
         if not jobs:
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -884,16 +973,39 @@ class BLGroup(app_commands.Group):
 
         await interaction.response.send_message(
             embed=embed,
-            view=ApplyJobView(jobs),
+            view=ApplyJobView(jobs, lang),
             ephemeral=True,
         )
 
+    @app_commands.command(
+        name="lang",
+        description="Show or change the bot language",
+    )
+    @app_commands.describe(lang="Language to switch to (omit to show the current one)")
+    @app_commands.choices(
+        lang=[
+            app_commands.Choice(name="English", value="en"),
+            app_commands.Choice(name="Русский", value="ru"),
+        ]
+    )
+    async def lang_cmd(
+        self, interaction: discord.Interaction, lang: str | None = None
+    ) -> None:
+        if lang is None:
+            current = get_lang(interaction)
+            await interaction.response.send_message(
+                t(current, "lang.current", language=lang_name(current))
+                + "\n"
+                + t(current, "lang.hint"),
+                ephemeral=True,
+            )
+            return
 
-class BL(commands.Cog):
-    def __init__(self, bot: commands.Bot) -> None:
-        self.bot = bot
-        if self.bot.tree.get_command("bl") is None:
-            self.bot.tree.add_command(BLGroup())
+        set_lang(interaction.user.id, lang)
+        await interaction.response.send_message(
+            t(lang, "lang.changed", language=lang_name(lang)),
+            ephemeral=True,
+        )
 
     async def cog_load(self) -> None:
         for record in load_ideas():
@@ -934,7 +1046,7 @@ class BL(commands.Cog):
                 await user.send(embed=embed)
             except discord.Forbidden:
                 await message.channel.send(
-                    "⚠️ Не удалось доставить сообщение — у автора закрыто ЛС.",
+                    t(DEFAULT_LANG, "idea.relay_dm_closed"),
                     delete_after=10,
                 )
             return

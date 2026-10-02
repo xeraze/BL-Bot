@@ -2,15 +2,10 @@ import json
 import uuid
 from pathlib import Path
 
+from utils.i18n import DEFAULT_LANG
+
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 APPLICATIONS_FILE = DATA_DIR / "applications.json"
-
-STATUS_LABELS = {
-    "new": "Новая",
-    "reviewing": "На рассмотрении",
-    "accepted": "Принята",
-    "rejected": "Отклонена",
-}
 
 ACTIVE_STATUSES = frozenset({"new", "reviewing"})
 
@@ -53,10 +48,12 @@ def create_application(
     experience: str,
     portfolio: str = "",
     comment: str = "",
+    lang: str = DEFAULT_LANG,
 ) -> dict:
     application = {
         "id": uuid.uuid4().hex[:8],
         "user_id": user_id,
+        "lang": lang,
         "job_id": job["id"],
         "job_title": job["title"],
         "job_description": job["description"],
